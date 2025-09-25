@@ -1,9 +1,10 @@
 const AWS = require('aws-sdk');
 const crypto = require('crypto');
 const https = require('https');
+const bcrypt = require('bcryptjs');
 const {
-    CognitoIdentityProviderClient,
-    ListUsersCommand,
+  CognitoIdentityProviderClient,
+  ListUsersCommand,
 } = require('@aws-sdk/client-cognito-identity-provider');
 const { validateCpf } = require('../utils/cpfValidator');
 
