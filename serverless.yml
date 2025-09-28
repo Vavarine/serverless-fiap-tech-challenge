@@ -15,18 +15,8 @@ provider:
     JWT_TTL_SECONDS: ${env:JWT_TTL_SECONDS, '900'}
     USER_POOL_ID: ${env:USER_POOL_ID}
     API_BASE_URL: ${env:API_BASE_URL, 'https://provenly-nonrenouncing-josephine.ngrok-free.dev'}
-    DYNAMODB_TABLE: ${self:service}-${self:provider.stage}
   
   iamRoleStatements:
-    - Effect: Allow
-      Action:
-        - dynamodb:Query
-        - dynamodb:Scan
-        - dynamodb:GetItem
-        - dynamodb:PutItem
-        - dynamodb:UpdateItem
-        - dynamodb:DeleteItem
-      Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.DYNAMODB_TABLE}"
     - Effect: Allow
       Action:
         - cognito-idp:ListUsers
@@ -42,8 +32,6 @@ functions:
           path: auth/cpf
           method: post
           cors: true
-    environment:
-      DYNAMODB_TABLE: ${self:provider.environment.DYNAMODB_TABLE}
 
   cartProxy:
     handler: src/handlers/auth.cartProxy
@@ -52,8 +40,6 @@ functions:
           path: carts
           method: post
           cors: true
-    environment:
-      DYNAMODB_TABLE: ${self:provider.environment.DYNAMODB_TABLE}
 
   registerUser:
     handler: src/handlers/auth.registerUser
@@ -62,8 +48,6 @@ functions:
           path: auth/register
           method: post
           cors: true
-    environment:
-      DYNAMODB_TABLE: ${self:provider.environment.DYNAMODB_TABLE}
 
   getUserByCpf:
     handler: src/handlers/auth.getUserByCpf
@@ -72,22 +56,6 @@ functions:
           path: user/{cpf}
           method: get
           cors: true
-    environment:
-      DYNAMODB_TABLE: ${self:provider.environment.DYNAMODB_TABLE}
-
-resources:
-  Resources:
-    UsersTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: ${self:provider.environment.DYNAMODB_TABLE}
-        AttributeDefinitions:
-          - AttributeName: cpf
-            AttributeType: S
-        KeySchema:
-          - AttributeName: cpf
-            KeyType: HASH
-        BillingMode: PAY_PER_REQUEST
 
 plugins:
   - serverless-offline

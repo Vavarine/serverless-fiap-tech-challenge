@@ -1,14 +1,10 @@
-const AWS = require('aws-sdk');
 const crypto = require('crypto');
 const https = require('https');
-const bcrypt = require('bcryptjs');
 const {
   CognitoIdentityProviderClient,
   ListUsersCommand,
 } = require('@aws-sdk/client-cognito-identity-provider');
 const { validateCpf } = require('../utils/cpfValidator');
-
-const dynamoDb = new AWS.DynamoDB.DocumentClient();
 
 // Configurações
 const REGION = process.env.AWS_REGION || 'us-east-1';
@@ -171,19 +167,19 @@ exports.authenticateCpf = async (event) => {
 };
 
 /**
- * Registra novo usuário
+ * Validação de dados para registro (usuário é criado na sua aplicação)
  */
 exports.registerUser = async (event) => {
   try {
-    const { cpf, nome, email, password } = JSON.parse(event.body);
+    const { cpf, nome, email } = JSON.parse(event.body);
 
     // Validar entrada
-    if (!cpf || !nome || !email || !password) {
+    if (!cpf || !nome || !email) {
       return {
         statusCode: 400,
         headers,
         body: JSON.stringify({
-          message: 'Todos os campos são obrigatórios',
+          message: 'CPF, nome e email são obrigatórios',
           success: false
         })
       };
@@ -201,57 +197,24 @@ exports.registerUser = async (event) => {
       };
     }
 
-    // Verificar se usuário já existe
-    const existingUser = await dynamoDb.get({
-      TableName: process.env.DYNAMODB_TABLE,
-      Key: { cpf }
-    }).promise();
-
-    if (existingUser.Item) {
-      return {
-        statusCode: 409,
-        headers,
-        body: JSON.stringify({
-          message: 'Usuário já cadastrado com este CPF',
-          success: false
-        })
-      };
-    }
-
-    // Hash da senha
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Salvar usuário
-    const newUser = {
-      cpf,
-      nome,
-      email,
-      hashedPassword,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    await dynamoDb.put({
-      TableName: process.env.DYNAMODB_TABLE,
-      Item: newUser
-    }).promise();
+    const cleanCpf = cpf.replace(/\D/g, '');
 
     return {
-      statusCode: 201,
+      statusCode: 200,
       headers,
       body: JSON.stringify({
-        message: 'Usuário criado com sucesso',
+        message: 'Dados validados. Usuário deve ser criado na aplicação principal.',
         success: true,
         data: {
-          cpf: newUser.cpf,
-          nome: newUser.nome,
-          email: newUser.email
+          cpf: cleanCpf,
+          nome,
+          email
         }
       })
     };
 
   } catch (error) {
-    console.error('Erro no registro:', error);
+    console.error('Erro na validação:', error);
     return {
       statusCode: 500,
       headers,
