@@ -13,11 +13,11 @@ module.exports = {
   },
   rules: {
     'indent': ['error', 2],
-    'linebreak-style': ['error', 'unix'],
+    'linebreak-style': 'off', // Permite diferentes line endings (Windows/Unix)
     'quotes': ['error', 'single'],
     'semi': ['error', 'always'],
     'no-unused-vars': ['error', { 'argsIgnorePattern': '^_' }],
-    'no-console': 'warn',
+    'no-console': 'off', // Permite console.log/error em Lambdas
     'prefer-const': 'error',
     'no-var': 'error'
   }
