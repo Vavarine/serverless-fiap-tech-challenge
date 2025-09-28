@@ -25,36 +25,12 @@ provider:
       Resource: "arn:aws:cognito-idp:${self:provider.region}:*:userpool/*"
 
 functions:
-  authCpf:
-    handler: src/handlers/auth.authenticateCpf
-    events:
-      - http:
-          path: auth/cpf
-          method: post
-          cors: true
-
   cartProxy:
     handler: src/handlers/auth.cartProxy
     events:
       - http:
           path: carts
           method: post
-          cors: true
-
-  registerUser:
-    handler: src/handlers/auth.registerUser
-    events:
-      - http:
-          path: auth/register
-          method: post
-          cors: true
-
-  getUserByCpf:
-    handler: src/handlers/auth.getUserByCpf
-    events:
-      - http:
-          path: user/{cpf}
-          method: get
           cors: true
 
 plugins:
