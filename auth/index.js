@@ -79,14 +79,14 @@ function makeHttpRequest(url, options, body) {
  * Proxy para API de carrinho com autenticação
  * Replica a funcionalidade do Lambda original
  */
-exports.cartProxy = async (event) => {
+exports.handler = async (event) => {
   try {
     const body = JSON.parse(event.body || '{}');
     const cpf = onlyDigits(body.cpf);
-    
+
     let token = null;
     let payload = {};
-    
+
     // Se tem CPF, faz autenticação
     if (cpf && cpf.length >= 11) {
       // Consulta no Cognito pelo atributo custom:cpf
@@ -123,7 +123,7 @@ exports.cartProxy = async (event) => {
       // Carrinho anônimo - gera token temporário
       const now = Math.floor(Date.now() / 1000);
       const anonymousId = `anon-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      
+
       payload = {
         sub: anonymousId,
         cpf: null,
@@ -134,17 +134,27 @@ exports.cartProxy = async (event) => {
         scope: 'customer:anonymous',
       };
     }
-    
+
     // Gera o token JWT
     token = signHS256({ alg: 'HS256', typ: 'JWT' }, payload, JWT_SECRET);
-    
-    // Prepara o body para a API (remove cpf se for null/undefined)
+
+    // Prepara o body para a API
     const bodyForAPI = { ...body };
-    if (!cpf) {
+
+    // Adiciona os dados necessários para a aplicação
+    bodyForAPI.token = token; // Token JWT
+
+    // Define customerId baseado no contexto
+    if (cpf && cpf.length >= 11) {
+      // Usuário autenticado - usa o sub do Cognito
+      bodyForAPI.customerId = payload.sub;
+      bodyForAPI.cpf = cpf; // CPF limpo
+    } else {
+      // Usuário anônimo - customerId null
+      bodyForAPI.customerId = null;
       delete bodyForAPI.cpf; // Remove cpf se não existir
     }
-    bodyForAPI.token = token; // Adiciona o token
-    
+
     // Prepara a chamada para sua API
     const apiOptions = {
       method: 'POST',
@@ -153,21 +163,21 @@ exports.cartProxy = async (event) => {
         'ngrok-skip-browser-warning': 'true'
       }
     };
-    
+
     // Se já tem Authorization header (usuário já autenticado), usa ele
     if (event.headers?.Authorization || event.headers?.authorization) {
       const authHeader = event.headers.Authorization || event.headers.authorization;
       apiOptions.headers['Authorization'] = authHeader;
       delete bodyForAPI.token; // Remove token do body se já está no header
     }
-    
+
     // Chama sua API
     const apiResponse = await makeHttpRequest(
       `${API_BASE_URL}/carts`,
       apiOptions,
       JSON.stringify(bodyForAPI)
     );
-    
+
     // Parse da resposta para objeto (se for JSON válido)
     let responseBody;
     try {
@@ -175,7 +185,7 @@ exports.cartProxy = async (event) => {
     } catch (e) {
       responseBody = { error: 'Invalid response from API', raw: apiResponse.body };
     }
-    
+
     // Retorna a resposta da API
     return {
       statusCode: apiResponse.statusCode,
