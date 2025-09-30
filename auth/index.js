@@ -1,54 +1,33 @@
-const crypto = require('crypto');
-const https = require('https');
+const crypto = require("crypto");
+const https = require("https");
 const {
   CognitoIdentityProviderClient,
   ListUsersCommand,
-} = require('@aws-sdk/client-cognito-identity-provider');
-const { validateCpf } = require('../utils/cpfValidator');
-
-// Configurações
-const REGION = process.env.AWS_REGION || 'us-east-1';
-const USER_POOL_ID = process.env.USER_POOL_ID;
-const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_ISS = process.env.JWT_ISS || 'cpf-auth';
-const JWT_AUD = process.env.JWT_AUD || 'lanchonete-api';
-const EXP_SECONDS = parseInt(process.env.JWT_TTL_SECONDS || '900', 10);
-const API_BASE_URL = process.env.API_BASE_URL || 'https://provenly-nonrenouncing-josephine.ngrok-free.dev';
-
-const cognito = new CognitoIdentityProviderClient({ region: REGION });
-
-const headers = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Content-Type': 'application/json'
-};
+} = require("@aws-sdk/client-cognito-identity-provider");
 
 // Helpers JWT simples (HS256)
 function b64url(input) {
   return Buffer.from(input)
-    .toString('base64')
-    .replace(/=/g, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_');
+    .toString("base64")
+    .replace(/=/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
 }
-
 function signHS256(header, payload, secret) {
   const h = b64url(JSON.stringify(header));
   const p = b64url(JSON.stringify(payload));
   const data = `${h}.${p}`;
   const sig = crypto
-    .createHmac('sha256', secret)
+    .createHmac("sha256", secret)
     .update(data)
-    .digest('base64')
-    .replace(/=/g, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_');
+    .digest("base64")
+    .replace(/=/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
   return `${data}.${sig}`;
 }
-
 function onlyDigits(s) {
-  return (s || '').replace(/\D/g, '');
+  return (s || "").replace(/\D/g, "");
 }
 
 // Função para fazer chamada HTTP
@@ -71,21 +50,24 @@ function makeHttpRequest(url, options, body) {
   });
 }
 
-// Função authenticateCpf removida - não necessária
+const REGION = process.env.AWS_REGION || process.env.REGION || "us-east-1";
+const USER_POOL_ID = process.env.USER_POOL_ID;
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_ISS = process.env.JWT_ISS || "cpf-auth";
+const JWT_AUD = process.env.JWT_AUD || "lanchonete-api";
+const EXP_SECONDS = parseInt(process.env.JWT_TTL_SECONDS || "900", 10);
+const API_BASE_URL = process.env.API_BASE_URL || "https://provenly-nonrenouncing-josephine.ngrok-free.dev";
 
-// Função registerUser removida - usuário é criado via /customer na sua aplicação
+const cognito = new CognitoIdentityProviderClient({ region: REGION });
 
-/**
- * Proxy para API de carrinho com autenticação
- * Replica a funcionalidade do Lambda original
- */
 exports.handler = async (event) => {
+
   try {
-    const body = JSON.parse(event.body || '{}');
-    const cpf = onlyDigits(body.cpf);
+
+    const cpf = onlyDigits(event.cpf);
 
     let token = null;
-    let payload = {};
+    let payload = {}; // ✅ Declarar a variável payload
 
     // Se tem CPF, faz autenticação
     if (cpf && cpf.length >= 11) {
@@ -101,12 +83,12 @@ exports.handler = async (event) => {
       if (!user || user.Enabled === false) {
         return {
           statusCode: 401,
-          headers,
-          body: JSON.stringify({ message: 'CPF não encontrado ou usuário desabilitado' }),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: "CPF não encontrado ou usuário desabilitado" }),
         };
       }
 
-      const subAttr = user.Attributes?.find((a) => a.Name === 'sub');
+      const subAttr = user.Attributes?.find((a) => a.Name === "sub");
       const sub = subAttr ? subAttr.Value : user.Username;
 
       const now = Math.floor(Date.now() / 1000);
@@ -117,12 +99,12 @@ exports.handler = async (event) => {
         exp: now + EXP_SECONDS,
         iss: JWT_ISS,
         aud: JWT_AUD,
-        scope: 'customer:authenticated',
+        scope: "customer:authenticated",
       };
     } else {
       // Carrinho anônimo - gera token temporário
       const now = Math.floor(Date.now() / 1000);
-      const anonymousId = `anon-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const anonymousId = `anon-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`; // ✅ ID mais único
 
       payload = {
         sub: anonymousId,
@@ -131,16 +113,15 @@ exports.handler = async (event) => {
         exp: now + EXP_SECONDS,
         iss: JWT_ISS,
         aud: JWT_AUD,
-        scope: 'customer:anonymous',
+        scope: "customer:anonymous",
       };
     }
 
     // Gera o token JWT
-    token = signHS256({ alg: 'HS256', typ: 'JWT' }, payload, JWT_SECRET);
+    token = signHS256({ alg: "HS256", typ: "JWT" }, payload, JWT_SECRET);
 
-    // Prepara o body para a API
-    const bodyForAPI = { ...body };
-
+    // ✅ Prepara o body para a API (remove cpf se for null/undefined)
+    const bodyForAPI = { ...event };
     // Adiciona os dados necessários para a aplicação
     bodyForAPI.token = token; // Token JWT
 
@@ -164,7 +145,7 @@ exports.handler = async (event) => {
       }
     };
 
-    // Se já tem Authorization header (usuário já autenticado), usa ele
+    // ✅ Se já tem Authorization header (usuário já autenticado), usa ele
     if (event.headers?.Authorization || event.headers?.authorization) {
       const authHeader = event.headers.Authorization || event.headers.authorization;
       apiOptions.headers['Authorization'] = authHeader;
@@ -172,40 +153,35 @@ exports.handler = async (event) => {
     }
 
     // Chama sua API
-    const apiResponse = await makeHttpRequest(
-      `${API_BASE_URL}/carts`,
-      apiOptions,
-      JSON.stringify(bodyForAPI)
-    );
+    // const apiResponse = await makeHttpRequest(
+    //     `${API_BASE_URL}/carts`,
+    //     apiOptions,
+    //     JSON.stringify(bodyForAPI) // ✅ Usa o body limpo
+    // );
 
-    // Parse da resposta para objeto (se for JSON válido)
-    let responseBody;
-    try {
-      responseBody = JSON.parse(apiResponse.body);
-    } catch (e) {
-      responseBody = { error: 'Invalid response from API', raw: apiResponse.body };
-    }
+    // ✅ Parse da resposta para objeto (se for JSON válido)
+    // let responseBody;
+    // try {
+    //     responseBody = JSON.parse(apiResponse.body);
+    // } catch (e) {
+    //     responseBody = { error: "Invalid response from API", raw: apiResponse.body };
+    // }
 
     // Retorna a resposta da API
     return {
-      statusCode: apiResponse.statusCode,
-      headers,
-      body: JSON.stringify(responseBody)
+      bodyForAPI // ✅ Sempre retorna JSON válido
     };
 
-  } catch (error) {
-    console.error('Erro no proxy do carrinho:', error);
+  } catch (err) {
+    console.error("Lambda Error:", err);
     return {
       statusCode: 500,
-      headers,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        message: 'Erro interno do servidor',
-        success: false,
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      })
+        message: "Erro interno",
+        error: err.message,
+        stack: err.stack // ✅ Para debug
+      }),
     };
   }
 };
-
-// Função getUserByCpf removida - consulta de usuário é feita via /customer na sua aplicação
