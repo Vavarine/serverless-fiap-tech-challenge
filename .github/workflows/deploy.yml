@@ -1,4 +1,3 @@
-`
 name: Zip and Upload to S3
 
 on:
@@ -27,4 +26,4 @@ jobs:
 
       - name: Upload to S3
         run: |
-          aws s3 cp auth.zip s3:/${{ secrets.S3_BUCKET_LAMBDA }}/functions/auth.zip
+          aws s3 cp auth.zip s3://${{ secrets.S3_BUCKET_LAMBDA }}/functions/auth.zip
