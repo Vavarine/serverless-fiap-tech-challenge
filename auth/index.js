@@ -140,6 +140,7 @@ exports.handler = async (event) => {
       return {
         valid: validation.valid,
         message: validation.error || "Valid token",
+        customerId: validation.valid ? validation.payload.sub : null,
       };
     }
 
