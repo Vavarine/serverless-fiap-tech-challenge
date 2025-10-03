@@ -130,14 +130,17 @@ exports.handler = async (event) => {
 
       if (!token) {
         return {
+          statusCode: 401,
           valid: false,
-          message: "Token missing"
+          message: "Token missing",
+          customerId: null
         };
       }
 
       const validation = validateToken(token, JWT_SECRET);
 
       return {
+        statusCode: validation.valid ? 200 : 401,
         valid: validation.valid,
         message: validation.error || "Valid token",
         customerId: validation.valid ? validation.payload.sub : null,
@@ -157,14 +160,15 @@ exports.handler = async (event) => {
         Filter: `username = "${cpf}"`,
         Limit: 1,
       });
+
       const res = await cognito.send(cmd);
+
       const user = (res.Users || [])[0];
 
       if (!user || user.Enabled === false) {
         return {
           statusCode: 401,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: "CPF não encontrado ou usuário desabilitado" }),
+          message: "CPF not found or user disabled",
         };
       }
 
@@ -172,6 +176,7 @@ exports.handler = async (event) => {
       const sub = subAttr ? subAttr.Value : user.Username;
 
       const now = Math.floor(Date.now() / 1000);
+
       payload = {
         sub,
         cpf,
@@ -200,31 +205,29 @@ exports.handler = async (event) => {
     // Gera o token JWT
     token = signHS256({ alg: "HS256", typ: "JWT" }, payload, JWT_SECRET);
 
-    // ✅ Prepara o body para a API (remove cpf se for null/undefined)
-    const bodyForAPI = { ...event };
+    const response = {
+      statusCode: 200,
+      message: "Success",
+    };
+
     // Adiciona os dados necessários para a aplicação
-    bodyForAPI.token = token; // Token JWT
+    response.token = token; // Token JWT
 
     // Define customerId baseado no contexto
     if (cpf && cpf.length >= 11) {
       // Usuário autenticado - usa o sub do Cognito
-      bodyForAPI.customerId = payload.sub;
-      bodyForAPI.cpf = cpf; // CPF limpo
+      response.customerId = payload.sub;
     } else {
       // Usuário anônimo - customerId null
-      bodyForAPI.customerId = null;
-      delete bodyForAPI.cpf; // Remove cpf se não existir
+      response.customerId = null;
     }
 
-    return bodyForAPI
+    return response;
   } catch (err) {
-
-    console.error("Lambda Error:", err);
-
     return {
-      message: "Internal server error",
+      statusCode: 500,
+      message: "Lambda error: " + err.message,
       error: err.message,
-      stack: err.stack // ✅ For debug
     };
   }
 };
