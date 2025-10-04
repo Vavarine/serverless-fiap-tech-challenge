@@ -33,4 +33,4 @@ jobs:
         with:
           token: ${{ secrets.REPO_TERRAFORM_TOKEN }}
           repository: Vavarine/terraform-fiap-tech-challenge
-          event-type: run-terraform
+          event-type: deploy-serverless
