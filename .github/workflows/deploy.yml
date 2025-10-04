@@ -29,7 +29,7 @@ jobs:
           aws s3 cp auth.zip s3://${{ secrets.S3_BUCKET_LAMBDA }}/functions/auth.zip
 
       - name: Trigger Terraform repository
-        uses: peter-evans/repository-dispatch@v3
+        uses: peter-evans/repository-dispatch@v4
         with:
           token: ${{ secrets.REPO_TERRAFORM_TOKEN }}
           repository: Vavarine/terraform-fiap-tech-challenge
